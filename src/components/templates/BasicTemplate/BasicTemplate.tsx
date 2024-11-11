@@ -1,24 +1,80 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { FormConfig } from '../../../types/form.types';
 
-const BasicTemplate = ({ config }) => {
-  const [formData, setFormData] = useState({});
-  const [errors, setErrors] = useState({});
+interface TemplateProps {
+  config: FormConfig;
+  styling: any;
+}
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    setErrors({ ...errors, [name]: "" });
+const BasicTemplate: React.FC<TemplateProps> = ({ config }) => {
+  const [formData, setFormData] = useState<{ [key: string]: any }>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const validateField = (field: any, value: any) => {
+    const fieldErrors: string[] = [];
+
+    if (field.required && !value) {
+      fieldErrors.push(`${field.label} is required`);
+    }
+
+    if (field.validation?.pattern && !field.validation.pattern.test(value)) {
+      fieldErrors.push(field.validation.customMessage || `${field.label} is invalid`);
+    }
+
+    if (field.validation?.minLength && value.length < field.validation.minLength) {
+      fieldErrors.push(field.validation.customMessage || `${field.label} is too short`);
+    }
+
+    if (field.validation?.maxLength && value.length > field.validation.maxLength) {
+      fieldErrors.push(field.validation.customMessage || `${field.label} is too long`);
+    }
+
+    if (field.type === "number") {
+      if (isNaN(Number(value))) {
+        fieldErrors.push(`${field.label} must be a number`);
+      } else {
+        if (field.validation?.minValue !== undefined && Number(value) < field.validation.minValue) {
+          fieldErrors.push(`${field.label} should be at least ${field.validation.minValue}`);
+        }
+        if (field.validation?.maxValue !== undefined && Number(value) > field.validation.maxValue) {
+          fieldErrors.push(`${field.label} should be at most ${field.validation.maxValue}`);
+        }
+      }
+    }
+
+    return fieldErrors;
   };
 
-  const renderRadioGroups = (field) => (
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+    config.fields.forEach((field) => {
+      const value = formData[field.name] || "";
+      const fieldErrors = validateField(field, value);
+      if (fieldErrors.length > 0) {
+        newErrors[field.name] = fieldErrors.join(" ");
+      }
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+    }));
+    setErrors((prevErrors) => ({ ...prevErrors, [name]: "" }));
+  };
+
+  const renderRadioGroups = (field: any) => (
     <>
       <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#4a4a4a' }}>
         {field.label}
       </label>
-      {field.groups?.map((group, index) => (
+      {field.groups?.map((group: any, index: number) => (
         <div key={index} style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', flexDirection: group.layout === "inline" ? "row" : "column", gap: '16px' }}>
-            {group.options.map((option, idx) => (
+            {group.options.map((option: string, idx: number) => (
               <label key={idx} style={{ fontSize: '14px', color: '#4a4a4a' }}>
                 <input
                   type="radio"
@@ -40,22 +96,29 @@ const BasicTemplate = ({ config }) => {
     </>
   );
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
+    if (validateForm()) {
+      console.log("Form submitted:", formData);
+    } else {
+      console.log("Validation failed. Check errors.");
+    }
   };
 
   return (
     <div style={{ width: '100%', maxWidth: '300px', margin: 'auto' }}>
-      <form style={{
-        backgroundColor: 'white',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        borderRadius: '8px',
-        padding: '24px 32px',
-        marginBottom: '16px'
-      }} onSubmit={handleSubmit}>
+      <form
+        style={{
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          borderRadius: '8px',
+          padding: '24px 32px',
+          marginBottom: '16px'
+        }}
+        onSubmit={handleSubmit}
+      >
         <h2 style={{ fontSize: '18px', fontWeight: '600', textAlign: 'center', marginBottom: '16px' }}>
-          {config.formName} JS
+          {config.formName}
         </h2>
         {config.fields.map((field, index) => (
           <div key={index} style={{ marginBottom: '16px' }}>
@@ -107,8 +170,6 @@ const BasicTemplate = ({ config }) => {
               cursor: 'pointer',
               transition: 'background-color 0.2s',
             }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#2b6cb0'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#3182ce'}
             type="submit"
           >
             Submit
